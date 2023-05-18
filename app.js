@@ -15,12 +15,15 @@ const LocalStrategy = require('passport-local');
 const User = require('./models/user');
 const mongoSanitize = require('express-mongo-sanitize');
 const helmet = require('helmet');
+const MongoStore = require('connect-mongo');
 
 const userRoutes = require('./routes/users');
 const campgroundRoutes = require('./routes/campgrounds')
 const reviewRoutes  = require('./routes/reviews')
 
-mongoose.connect('mongodb://127.0.0.1:27017/yelp-camp',{
+
+const dbUrl = 'mongodb://127.0.0.1:27017/yelp-camp';
+mongoose.connect( dbUrl ,{
     useNewUrlParser: true,
     useUnifiedTopology: true
 });
@@ -43,7 +46,20 @@ app.use(express.urlencoded({ extended: true}))
 app.use(methodOverride('_method'));
 app.use(express.static(path.join(__dirname, 'public')))
 
+const store = MongoStore.create({
+    mongoUrl: dbUrl,
+    touchAfter: 24 * 60 * 60,
+    crypto: {
+        secret: 'thisshouldbeabettersecret'
+    }
+})
+
+store.on("error", function(e) {
+    console.log("SESSION STORE ERROR", e)
+})
+
 const sessionConfig = {
+    store,
     name: 'session',
     secret: 'thisshouldbeabettersecret',
     resave: false,
@@ -67,6 +83,7 @@ const scriptSrcUrls = [
     "https://cdn.jsdelivr.net",
 ];
 const styleSrcUrls = [
+    "https://stackpath.bootstrapcdn.com",
     "https://kit-free.fontawesome.com",
     "https://api.mapbox.com",
     "https://api.tiles.mapbox.com",
@@ -113,7 +130,6 @@ passport.deserializeUser(User.deserializeUser())
 
 app.use(flash());
 app.use((req,res,next) => {
-    console.log(req.query)
     res.locals.currentUser = req.user;
     res.locals.success = req.flash('success');
     res.locals.error = req.flash('error');
